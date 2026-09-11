@@ -40,8 +40,19 @@ test('a task row renders an insert button that is enabled with a composer', () =
 test('pressing the button appends, keeping the draft the user already typed', () => {
   const bundle = loadBundle();
   const written = [];
+  // The row carries the whole description; the composer must get the task line
+  // and nothing else. An agent-created task's description is an essay — meeting,
+  // priority, tokens, source ids — and pasting it buries the actual task.
   const button = insertButtonFor(bundle, {
-    task: { id: 'g1', title: '写周报', due: undefined, dueAllDay: false, completed: false, tasklistName: '团队清单' },
+    task: {
+      id: 'g1',
+      title: '写周报',
+      description: '会议：综合 PRD 会议总结（含两场分段讨论） 优先级：medium 详情：只列菜名不配图 妙记 token：obcnw73zy7789zo97yfe24zm 来源任务：13da1434-71e7-4262-adf7-f0ef523b109f',
+      due: undefined,
+      dueAllDay: false,
+      completed: false,
+      tasklistName: '团队清单',
+    },
     draft: '已有的内容',
     written,
   });
@@ -51,6 +62,25 @@ test('pressing the button appends, keeping the draft the user already typed', ()
   assert.ok(written[0].includes('写周报'), written[0]);
   assert.ok(written[0].includes('团队清单'), written[0]);
   assert.ok(written[0].includes('\n'), 'the appended block must start on its own line');
+  assert.ok(!written[0].includes('会议'), `the description must not be pasted in: ${JSON.stringify(written[0])}`);
+  assert.ok(!written[0].includes('obcnw73zy7789zo97yfe24zm'), 'no 妙记 token in the composer');
+  assert.ok(!written[0].includes('13da1434-71e7-4262'), 'no source-task uuid in the composer');
+});
+
+test('an over-long or multi-line title is flattened to one checkbox line', () => {
+  const bundle = loadBundle();
+  const written = [];
+  // A title with a newline reaches the row as-is; the composer block must not
+  // inherit it, or the "one task, one line" shape breaks.
+  const button = insertButtonFor(bundle, {
+    task: { id: 'g1', title: '第一行\n  第二行', description: '不该出现的内容', completed: false },
+    draft: '',
+    written,
+    titleNeedle: '第一行',
+  });
+  button.props.onClick();
+  assert.equal(written.length, 1);
+  assert.equal(written[0], '- [ ] 第一行 第二行', `one flat line, nothing else: ${JSON.stringify(written[0])}`);
 });
 
 test('an empty draft receives the block with no leading newline', () => {

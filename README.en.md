@@ -39,154 +39,157 @@ From the repository root, run:
 # Link the DSH runtime dependencies. Safe to re-run.
 node scripts/bootstrap-deps.mjs
 
-# Validate the installation before applying it.
+# Self-check before installing.
 node scripts/check.mjs
 
-# Add the plugin to the DSH web profile. The original file is backed up first.
+# Write into DSH's web profile; the current configuration is backed up first.
 node scripts/apply-profile.mjs
 ```
 
-Restart `dsh web`, then refresh the browser. A restart is required on first installation and after changes to `lib/index.js`; changes to `lib/client.js` only require a browser refresh.
+Then restart `dsh web` and refresh the browser. The first install always requires the restart. Later changes to `lib/index.js` require it too; changes to `lib/client.js` only need a page refresh.
 
-To preview the profile change without writing it:
+To preview without modifying anything:
 
 ```powershell
 node scripts/apply-profile.mjs --dry-run
 ```
 
-See [docs/install.md](docs/install.md) for detailed installation, isolated validation, and a custom DSH path.
+Installation details, isolated verification, and custom DSH paths are covered in [docs/install.md](docs/install.md).
 
-### 2. Create and configure a Feishu app
+### 2. Create and configure the Feishu app
 
-Create an **enterprise custom app** in the [Feishu Developer Console](https://open.feishu.cn/app), then:
+Create an "enterprise self-built app" in the [Feishu developer console](https://open.feishu.cn/app) and do the following:
 
 1. Add and publish the **Bot** capability.
-2. Request and publish the permissions below.
+2. Request and publish the permissions listed below under "Permissions".
 3. Publish the app and add yourself to its availability scope.
 
 | Permission | Purpose | Required |
 | --- | --- | --- |
-| `im:chat:readonly` | List chats the bot belongs to | Yes |
+| `im:chat:readonly` | List the chats the bot is in | Yes |
 | `im:message:readonly` | Read messages | Yes |
-| `im:message.group_msg` | Read all group messages | Yes, for chat summaries |
+| `im:message.group_msg` | Read all messages in a group | Yes, for chat summaries |
 | `task:tasklist:read` | Read task lists | Yes, for the task list |
-| `task:task:read` | Read tasks assigned to you | Yes, after sign-in |
-| `task:task:write` | Complete or restore tasks | Yes, for the Complete button |
-| `offline_access` | Receive a refresh token and stay signed in | Recommended |
+| `task:task:read` | Read tasks assigned to you | Yes, after signing in |
+| `task:task:write` | Complete or reopen a task | Yes, when using the Complete button |
+| `offline_access` | Obtain a refresh token to stay signed in | Recommended |
 
-If you add permissions later, authorize the plugin again. Existing tokens do not automatically gain new permissions.
+If you add a permission later, **re-authorize** in the plugin: an existing token does not gain the new permission automatically.
 
-### 3. Set the App ID and App Secret
+### 3. Enter the App ID and App Secret
 
-After restarting, open **Settings → Plugins → Plugin configuration → feishu-plugin** in DSH. Enter the Feishu App ID and App Secret, then save.
+After the restart, open in DSH: **Settings → Plugins → Plugin configuration → feishu-plugin**, enter the Feishu app's App ID and App Secret, and save.
 
-You can also configure them from the command line:
+The same thing from the command line:
 
 ```powershell
 node scripts/apply-settings.mjs --app-id cli_xxx --app-secret your_secret
 node scripts/apply-settings.mjs --show
 ```
 
-The settings are written to the `feishu-plugin` section of `$DSH_HOME/settings.yaml` and hot-reload without another restart. Secrets are never returned by the read APIs or repopulated in the settings form.
+The configuration is written to the `feishu-plugin` section of `$DSH_HOME/settings.yaml` and hot-reloaded, so no further restart is needed. The secret is never echoed back by a read endpoint or the settings form.
 
-## Using it in DSH
+## Using it inside DSH
 
-Click **Feishu** at the bottom of the left sidebar:
+Click "飞书" at the bottom of the left sidebar:
 
 | Where | What you can do |
 | --- | --- |
-| In a conversation | Open the Feishu panel in the right sidebar. Add to input appends context to the current conversation draft. |
-| On the home page | Open the full Feishu page. Tasks and chats are available, but there is no active conversation input to populate. |
+| Inside a session | Open the "飞书" panel on the right; "add to input" appends to the current conversation draft. |
+| Home screen | Open the full Feishu page; tasks and chats are available, but there is no session input to insert into. |
 
-In the panel:
+Inside the panel:
 
-1. **My tasks**: view task lists immediately. To see tasks assigned to you or complete a task, select **Sign in to Feishu** once.
-2. **Chat summaries**: select a chat where the bot is a member, read its messages, or generate an AI summary and action items.
-3. To continue with a model, select **Add to input** on a task, message, or action item; review the draft and send it yourself.
+1. **My tasks**: the task list is shown first; to see tasks assigned to you or to complete a task, click "Sign in to Feishu" and authorize once.
+2. **Chat summaries**: pick a chat the bot is in, read the messages first, or generate an AI summary and action items.
+3. When the model should take something further, click "add to input" next to any task, message, or action item, then review it yourself before sending.
 
-## Why Feishu sign-in is sometimes required
+What "add to input" inserts is deliberately short. A task becomes **one line**, `- [ ] task title（due …）[list: …]`, and a message becomes a quote line, `> [HH:mm]Name: text`. A task's **description is not inserted**: tasks created by an agent tend to pack the meeting, the priority, a 妙记 token, and a source uuid into the description, and pasting all of that buries the one sentence you meant to act on. The description still lives in Feishu itself, and the panel row does not show it either.
 
-With only an App ID and App Secret, the plugin can read task lists and chats where the bot is a member. The following actions require your `user_access_token`:
+## Why you sometimes need to sign in to Feishu
 
-- Read tasks assigned to you.
-- Complete or restore a task.
+With only the App ID / App Secret configured, the plugin already reads task lists and the bot's chats as the bot. These operations require your `user_access_token`:
 
-Authorization is normally needed only once. The plugin attempts to refresh an expired token automatically.
+- reading tasks assigned to you;
+- completing or reopening a task.
 
-### Copy-and-paste OAuth callback flow
+One authorization is usually enough. When the token expires, the plugin tries to refresh it automatically.
 
-Feishu requires an OAuth redirect URI to be on the app allowlist and may reject a local `127.0.0.1` address. If your app uses an existing public callback URL:
+### The copy-paste way to handle the authorization callback
 
-1. Set that allowlisted URL as `oauthRedirectUri` in the plugin settings.
-2. Select **Open authorization page** and authorize the app in Feishu.
-3. After the browser reaches the callback address, copy the **entire URL** from the address bar into the plugin authorization area and select **Exchange callback URL**.
+Feishu requires the OAuth redirect address to be on the app's allowlist in advance, and often refuses a local `127.0.0.1` address. If your app's callback is an existing public address, do this:
 
-An error on the callback page itself does not prevent this flow: the code can still be exchanged while it remains in the URL. Authorization codes are short-lived and single-use, so paste it right away.
+1. Put that allowlisted address into the plugin's `oauthRedirectUri`.
+2. Click "Open authorization page" and authorize in Feishu.
+3. After the browser lands on the callback address, copy the **complete URL from the address bar** into the plugin's authorization area and click "Exchange the callback URL".
+
+An error on the callback page itself does not matter for this step: as long as the URL still carries a `code`, it can be exchanged. The authorization code is short-lived and single-use, so paste it promptly.
 
 ## Common configuration
 
-| Setting | Default | Description |
+| Setting | Default | Meaning |
 | --- | --- | --- |
-| `appId` / `appSecret` | Empty | Feishu app credentials; required |
-| `baseUrl` | `https://open.feishu.cn` | Use `https://open.larksuite.com` for Lark International |
-| `oauthRedirectUri` | Empty | Must exactly match the Feishu allowlisted redirect URI |
-| `maxMessages` | `200` | Messages to read for each summary; range: 10–2000 |
-| `summaryProvider` / `summaryModel` | Empty | Uses DSH's current default model when empty |
-| `toolsEnabled` | `true` | Enables or disables the two model tools |
+| `appId` / `appSecret` | empty | Feishu app credentials, required |
+| `baseUrl` | `https://open.feishu.cn` | Lark international uses `https://open.larksuite.com` |
+| `oauthRedirectUri` | empty | Must match the Feishu console's allowlist exactly |
+| `maxMessages` | `200` | Messages read per summary, 10–2000 |
+| `summaryProvider` / `summaryModel` | empty | Empty uses DSH's current default model |
+| `toolsEnabled` | `true` | Whether to provide the two model tools |
 
-To change one setting from the command line:
+Changing a single key from the command line:
 
 ```powershell
 node scripts/apply-settings.mjs --set "maxMessages=300"
 node scripts/apply-settings.mjs --set "baseUrl=https://open.larksuite.com"
 ```
 
-**Important: an empty settings field or command argument means “leave unchanged,” not “clear this setting.”** To remove an existing value, edit `$DSH_HOME/settings.yaml` directly.
+**Note: leaving a field blank in the settings form or on the command line means "do not change", not "clear".** To remove a stored value, edit `$DSH_HOME/settings.yaml` directly.
 
-## Troubleshooting
+## FAQ
 
-### No chats or messages appear
+### No chats or messages show up
 
-Confirm that the bot capability is published, the bot has joined the target chat, and the app has `im:chat:readonly`, `im:message:readonly`, and `im:message.group_msg`. Chat history is only available for chats the bot belongs to.
+Confirm the Bot capability has been published, the bot has been added to the target group, and `im:chat:readonly`, `im:message:readonly`, and `im:message.group_msg` are granted. Group history only reads chats the bot is in.
 
-### No tasks assigned to me
+### There are no "assigned to me" tasks in the task area
 
-Select **Sign in to Feishu** to finish user authorization and confirm that `task:task:read` has been published. Without sign-in, the plugin falls back to task lists; this is expected.
+Click "Sign in to Feishu" first to authorize, and confirm `task:task:read` is published. While signed out, the plugin falls back to task lists, which is intended behaviour.
 
-### Completing a task fails
+### Clicking "Complete" fails
 
-This operation writes to Feishu, so it requires user sign-in and `task:task:write`. If that permission was added later, authorize again.
+That operation writes to Feishu, so it needs a signed-in user with `task:task:write`. When the permission was added later, re-authorize.
 
-### The redirect URI is rejected
+### The app says the redirect address is invalid
 
-Check that `oauthRedirectUri` exactly matches **Security settings → Redirect URL** in the Feishu Developer Console. If a local address is not accepted, use an allowlisted public callback URL and the copy-and-paste exchange flow above.
+Check that `oauthRedirectUri` and the Feishu console's "Security settings → Redirect URL" match character for character. When a local address cannot be used, switch to a registered public callback and use the copy-paste exchange above.
 
-### A saved setting does not take effect
+### Saving the settings had no effect
 
-Run `node scripts/apply-settings.mjs --show` to confirm the location and value. If you just installed the plugin, restart `dsh web` once so its settings section can register.
+Use `node scripts/apply-settings.mjs --show` to confirm where and what was written. If the plugin was just installed, restart `dsh web` once first so the plugin's settings section finishes registering.
 
-## Development and validation
+## Development and verification
 
 ```powershell
-node scripts/check.mjs              # Syntax, dependencies, and tests
-node scripts/panel-check.mjs        # Validate loading and APIs in an isolated DSH home
-node scripts/panel-check.mjs --ui   # Additionally attempt headless-browser UI validation
+node scripts/check.mjs              # syntax, dependencies, and tests
+node scripts/panel-check.mjs        # verify plugin loading and endpoints in an isolated DSH home
+node scripts/panel-check.mjs --ui   # additionally attempt a headless-browser UI check
 ```
 
-For local development without a real Feishu tenant, start the bundled fake Feishu service:
+During development you can start a local fake Feishu service, no real tenant required:
 
 ```powershell
 node scripts/stub-feishu.mjs 3098
+# STUB_NO_MEMBERS=1 makes the member endpoint fail, i.e. the "unknown member" path
 ```
 
-The same-origin HTTP API lives under `/plugin/feishu/api/*`. See [docs/install.md](docs/install.md) and comments in `lib/` for source responsibilities and full installation wiring.
+The project's HTTP endpoints live under the same-origin path `/plugin/feishu/api/*`. For the source layout and the full installation wiring, see [docs/install.md](docs/install.md) and the comments under `lib/`.
 
 ## Known limitations
 
-- Feishu topic (thread) messages are not yet supported; only the main chat is read.
-- The UI renders at most the latest 300 messages; the backend read limit can still be raised to 2000 with `maxMessages`.
-- Other members usually have stable initial avatars; real avatars require additional directory permissions.
-- Whether model tools appear in a particular conversation also depends on that DSH composition's Agent preset configuration.
+- Feishu thread (topic) messages are not supported; only the main group conversation is read.
+- The front end renders at most the newest 300 messages; the backend read cap can still be raised to 2000 via `maxMessages`.
+- Other members usually show as a stable initial-circle avatar; real avatars need an extra contacts permission.
+- Whether the model tools appear in a given session also depends on that DSH composition's agent presets.
 
 ## License
 

@@ -303,7 +303,9 @@ export function insertButtonFor(bundle, scenario) {
     onComplete: () => {},
     face,
   });
-  return findInsertButton(view, scenario.task.title);
+  // The row renders the raw title, while the composer block flattens it, so a
+  // case whose title has a newline passes the fragment that survives.
+  return findInsertButton(view, scenario.titleNeedle ?? scenario.task.title);
 }
 
 /**
