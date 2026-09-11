@@ -1,0 +1,8 @@
+# Dependency links created by scripts/bootstrap-deps.mjs
+node_modules/
+
+# Isolated dsh home used by scripts/panel-check.mjs
+.dsh-test/
+
+# Profile patch backups written by scripts/apply-profile.mjs
+*.bak

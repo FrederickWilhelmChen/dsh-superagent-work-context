@@ -1,0 +1,7 @@
+# Keep every text file LF in the repository, whatever the checkout's platform:
+# the sources are read by Node and by a hand-written browser bundle, so a mixed
+# CRLF history would show up as whole-file diffs.
+* text=auto eol=lf
+
+# These are generated or binary; never try to normalise them.
+*.png binary
