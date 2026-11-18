@@ -1,6 +1,6 @@
 {
   "name": "dsh-superagent-work-context",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Evidence-backed Feishu work context and private reminders for DSH SuperAgent",
   "license": "MIT",
   "keywords": ["dsh-plugin", "deepseek-harness", "superagent", "feishu"],

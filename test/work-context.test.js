@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { DatabaseSync } from 'node:sqlite';
 import { createFeishu, pages } from '../src/feishu.js';
 import { runCycle } from '../src/loop.js';
+import { importLegacy } from '../src/legacy.js';
 import { dispatch } from '../src/review.js';
 import { Store } from '../src/store.js';
 
@@ -239,4 +241,57 @@ test('accepts an unattributed Feishu system record without losing human messages
   });
   assert.equal(s.snapshot().coverage.gaps.length, 0);
   assert.equal(s.outbound.length, 1);
+});
+
+test('imports known source IDs without replaying mixed-format history and still records genuine edits and recalls', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'work-context-migration-'));
+  const path = join(dir, 'legacy.sqlite3');
+  const old = new DatabaseSync(path);
+  const store = new Store(join(dir, 'native.sqlite3'));
+  t.after(() => { store.close(); rmSync(dir, { force: true, recursive: true }); });
+  try {
+    old.exec(`
+      CREATE TABLE meta (key TEXT, value TEXT); CREATE TABLE groups (id TEXT, name TEXT, active INTEGER);
+      CREATE TABLE evidence (seq INTEGER, id TEXT, source TEXT, body TEXT);
+      CREATE TABLE materials (id TEXT, url TEXT, origin TEXT, kind TEXT);
+      CREATE TABLE topics (id TEXT, checked TEXT);
+      CREATE TABLE versions (rev INTEGER, through_seq INTEGER, body TEXT);
+      CREATE TABLE outbox (state TEXT, body TEXT, attempted TEXT, receipt TEXT);`);
+    old.prepare('INSERT INTO meta VALUES (?, ?)').run('scan', new Date(start).toISOString());
+    old.prepare('INSERT INTO groups VALUES (?, ?, 1)').run(A, 'Group A');
+    old.prepare('INSERT INTO evidence VALUES (1, ?, ?, ?)').run('om_One', A, JSON.stringify({
+      time: new Date(start - 10000).toISOString(), type: 'user', sender: 'ou_Alice', text: 'Owner, please review',
+      url: 'https://applink.feishu.cn/client/chat/open?openChatId=oc_GroupA&position=42',
+    }));
+    old.prepare('INSERT INTO versions VALUES (2, 1, ?)').run(JSON.stringify(reply([reminder('follow_up', 'om_One')])));
+    old.prepare('INSERT INTO outbox VALUES (?, ?, NULL, ?)').run('sent',
+      JSON.stringify({ key, trigger: 'om_One', status: 'follow_up' }), 'om_Receipt');
+  } finally { old.close(); }
+  importLegacy({ store, path, identity: bot, groups: [{ id: A, name: 'Group A' }] });
+  assert.equal(store.highwater(), 1);
+  const native = { id: 'om_One', source: A, kind: 'message', at: start - 10000, human: true,
+    author: 'Alice', deleted: false, text: 'Owner,  please review' };
+  store.append(native);
+  assert.equal(store.highwater(), 1);
+  store.append({ ...native, deleted: true, text: '' });
+  assert.equal(store.highwater(), 2);
+  store.append({ ...native, editedAt: start + 1000, text: 'Owner, please review the edited request.' });
+  assert.equal(store.highwater(), 3);
+  assert.equal(store.view().through, 1);
+  assert.deepEqual(store.receiptCounts(), { sent: 1 });
+});
+
+test('reads a Minutes transcript using a permitted relative output directory and cleans it up', async () => {
+  let runDir;
+  const feishu = createFeishu({ async lark(args, cwd) {
+    assert.equal(args[args.indexOf('--output-dir') + 1], 'transcript');
+    runDir = cwd;
+    const target = join(cwd, 'transcript');
+    mkdirSync(target);
+    writeFileSync(join(target, 'meeting.txt'), 'Alice assigned the next action to Owner.');
+    return { minutes: [{ title: 'Review' }] };
+  } }, 'feishu');
+  const record = await feishu.transcript({ id: 'Meeting1', source: A, url, origin: 'om_One' });
+  assert.equal(record.text, 'Alice assigned the next action to Owner.');
+  assert.throws(() => readFileSync(join(runDir, 'transcript', 'meeting.txt')), /ENOENT/);
 });

@@ -11,6 +11,8 @@ export function importLegacy({ store, path, identity, groups }) {
     const view = source.prepare('SELECT * FROM versions ORDER BY rev DESC LIMIT 1').get();
     if (!view) throw new Error('Legacy work context has no reviewed version');
     const context = JSON.parse(view.body);
+    const scan = Date.parse(source.prepare("SELECT value FROM meta WHERE key = 'scan'").get()?.value);
+    if (!Number.isFinite(scan)) throw new Error('Legacy work context has no valid scan time');
     const owner = identity[2];
     if (context.actions.some(action => ['follow_up', 'operate', 'approve'].includes(action.status) && action.owner !== owner)) {
       throw new Error('Legacy work-context owner does not match plugin configuration');
@@ -60,7 +62,7 @@ export function importLegacy({ store, path, identity, groups }) {
             text: body.text, url: body.url };
         }
         if (!record) continue;
-        store.append(record, discoverMeetingLinks(record));
+        store.append({ ...record, legacy: true }, discoverMeetingLinks(record));
         if (row.seq <= view.through_seq) importedThrough = store.highwater();
       }
       const material = store.db.prepare('INSERT OR IGNORE INTO materials VALUES (?, ?, ?)');
@@ -96,7 +98,7 @@ export function importLegacy({ store, path, identity, groups }) {
         insert.run(id, key, trigger, JSON.stringify({ id, key, trigger, status }), Date.parse(row.attempted) || null,
           row.receipt, row.state === 'sent' ? 'sent' : 'uncertain');
       }
-      store.setMeta('legacyImported', { revision: view.rev, through: view.through_seq });
+      store.setMeta('legacyImported', { revision: view.rev, through: view.through_seq, scan });
     });
   } finally {
     source.close();

@@ -8,7 +8,7 @@ Derived from [zjuatri/dsh-feishu-plugin](https://github.com/zjuatri/dsh-feishu-p
 
 Requires Node 22.19+ and a running dsh-superagent profile with a configured Feishu Source. Install the archive through Plugin Manager in that profile, or use the DSH CLI.
 
-    dsh plugin --profile superagent add /absolute/path/dsh-superagent-work-context-0.1.0.tgz
+    dsh plugin --profile superagent add /absolute/path/dsh-superagent-work-context-0.1.1.tgz
 
 In Plugin Configuration select **SuperAgent Work Context**. Supply the ownerId open ID for the bot app and the owner's display name. Set enabled to true to start. Keep deliverPrivate false while checking the snapshot, then enable delivery for qualified reminders. Disable the bundle to stop collection and review. Its state remains on disk.
 

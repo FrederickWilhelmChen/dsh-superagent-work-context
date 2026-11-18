@@ -16,7 +16,9 @@ for work the configured owner must now do. "next" says who asked, the concrete a
 Use waiting for dependencies. Use closed only for confirmed completion, withdrawal, or replacement.
 Only transition to active on a newly reviewed live human message or a meeting document with a
 real human attribution and a current, explicit action for the owner, or an already documented
-checkpoint that has arrived. A transferred quotation does not restart an action. Include evidence that specifically names,
+checkpoint that has arrived. For a new owner action, only an ID in the current evidence list, or that action's supplied
+checkpoint evidence, can be its trigger. Past or related evidence can corroborate but cannot
+trigger a new reminder. A transferred quotation does not restart an action. Include evidence that specifically names,
 mentions or was written by the owner. Use a source
 ID in trigger, and include it in evidence. Reuse the established trigger for an unchanged active
 action. For an explicit future checkpoint provide checkAt as an ISO 8601 timestamp with offset
@@ -256,15 +258,27 @@ export async function review({ store, llm, route, ownerId, ownerName, identity, 
     const related = store.related({ through: prev.through, threads: grouping.threads,
       terms: grouping.topics.map(([term]) => term), limit: 18 })
       .map(record => ({ ...record, text: record.text.slice(0, 1500) }));
-    const result = await runModel(ctxPrompt, {
+    const input = {
       owner: { id: ownerId, name: ownerName }, now: new Date(clock).toISOString(),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       groups: groups.map(({ id, name }) => ({ id, name })), coverage,
       context: prev.context, due: relevantDue, invalid: relevantInvalid,
       evidence: batch, grouping, relatedEvidence: related, checkpointEvidence: relevantDue.map(item => store.latest(item.checkTrigger)),
-    });
-    const { context, reminders } = reconcile({ result, prev, store, batch, related, due: relevantDue,
+    };
+    const applyResult = result => reconcile({ result, prev, store, batch, related, due: relevantDue,
       invalid: relevantInvalid, groups: sources, ownerId, ownerName, identity, clock });
+    let patch;
+    const result = await runModel(ctxPrompt, input);
+    try {
+      patch = applyResult(result);
+    } catch (error) {
+      // Give the model one opportunity to correct an invalid structured patch.
+      // Never write the patch or consume evidence until validation succeeds.
+      const correction = await runModel(ctxPrompt, { ...input,
+        correction: { rejected: result, reason: error.message } });
+      patch = applyResult(correction);
+    }
+    const { context, reminders } = patch;
     signal.throwIfAborted();
     store.save(prev, through, context, reminders);
     prev = store.view();

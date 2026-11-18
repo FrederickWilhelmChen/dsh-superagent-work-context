@@ -90,7 +90,18 @@ export class Store {
   append(record, links = []) {
     const body = JSON.stringify(record);
     const last = this.db.prepare('SELECT body FROM evidence WHERE id = ? ORDER BY seq DESC LIMIT 1').get(record.id);
-    if (last?.body !== body) this.db.prepare('INSERT INTO evidence (id, source, body) VALUES (?, ?, ?)').run(record.id, record.source, body);
+    const previous = last && JSON.parse(last.body);
+    // The legacy reader and the native API serialize the same message differently.
+    // Feishu edit time and recall state identify real changes during the overlapping read.
+    const legacyScan = previous?.legacy && !record.legacy ? this.meta('legacyImported')?.scan : undefined;
+    const migrationOverlap = Number.isFinite(legacyScan) && (
+      record.kind === 'message'
+        ? record.deleted === previous.deleted && Math.max(record.at, record.editedAt ?? 0) <= legacyScan
+        : record.kind === 'document' && record.text === previous.text
+    );
+    if (last?.body !== body && !migrationOverlap) {
+      this.db.prepare('INSERT INTO evidence (id, source, body) VALUES (?, ?, ?)').run(record.id, record.source, body);
+    }
     if (record.thread) this.db.prepare('INSERT OR IGNORE INTO threads (id, source) VALUES (?, ?)').run(record.thread, record.source);
     const material = this.db.prepare('INSERT OR IGNORE INTO materials VALUES (?, ?, ?)');
     for (const link of links) material.run(link.id, link.source, JSON.stringify(link));

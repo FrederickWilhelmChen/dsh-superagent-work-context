@@ -35,6 +35,11 @@ export function discoverMeetingLinks(record) {
   });
 }
 
+function timestamp(value) {
+  if (typeof value === 'number') return value;
+  return typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : Date.parse(value);
+}
+
 function normalize(raw, group, brand, authors, thread) {
   if (!messageId.test(raw.message_id) || raw.chat_id !== group) {
     throw new Error('Invalid message ID or unexpected Feishu chat');
@@ -44,8 +49,7 @@ function normalize(raw, group, brand, authors, thread) {
   const deleted = raw.deleted === true;
   const unattributed = msgType === 'system' || deleted;
   if (!unattributed && (!sender?.id || !sender.sender_type)) throw new Error('Feishu message is missing its sender');
-  const numeric = Number(raw.create_time);
-  const at = Number.isFinite(numeric) ? numeric : Date.parse(raw.create_time);
+  const at = timestamp(raw.create_time);
   if (!Number.isFinite(at) || at <= 0) throw new Error('Invalid Feishu message timestamp');
   const domain = brand === 'lark' ? 'larksuite.com' : 'feishu.cn';
   const topic = raw.thread_id ?? thread;
@@ -54,8 +58,10 @@ function normalize(raw, group, brand, authors, thread) {
     ? `https://applink.${domain}/client/chat/open?openChatId=${group}&position=${position}`
     : (typeof raw.message_app_link === 'string' ? raw.message_app_link : undefined);
   const senderId = sender?.id || (msgType === 'system' ? 'system' : 'deleted');
+  const updated = timestamp(raw.update_time);
   return {
     id: raw.message_id, source: group, kind: 'message', at,
+    editedAt: Number.isFinite(updated) && updated > at ? updated : undefined,
     author: sender?.name ?? authors.get(senderId) ?? senderId,
     sender: senderId,
     human: sender?.sender_type === 'user' && !sender.is_agent && msgType !== 'system',
@@ -132,7 +138,7 @@ export function createFeishu(commands, brand) {
     async transcript(material) {
       const dir = await mkdtemp(join(tmpdir(), 'superagent-minutes-'));
       try {
-        const data = await commands.lark(['minutes', '+detail', '--minute-tokens', material.id, '--transcript', '--output-dir', dir]);
+        const data = await commands.lark(['minutes', '+detail', '--minute-tokens', material.id, '--transcript', '--output-dir', 'transcript'], dir);
         const item = data.minutes[0];
         if (!item || item.error) throw new Error(item?.error ?? 'Feishu Minutes response did not include the recording');
         const names = await readdir(dir, { recursive: true, withFileTypes: true });
