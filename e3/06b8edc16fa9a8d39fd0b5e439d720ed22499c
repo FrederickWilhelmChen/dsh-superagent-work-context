@@ -1,0 +1,32 @@
+src/feishu.js
+  s_ec5f172ef9c576::t_fca3df8c058139 38,40-42,52,61,64,141
+  s_ec5f172ef9c576::t_e7f5809b63591b 39
+src/review.js
+  s_ec5f172ef9c576::t_fca3df8c058139 19-21,261,267-268,270-281
+src/legacy.js
+  s_ec5f172ef9c576::t_fca3df8c058139 14-15,65,101
+src/store.js
+  s_ec5f172ef9c576::t_fca3df8c058139 93-104
+package.json
+  s_ec5f172ef9c576::t_fca3df8c058139 3
+README.md
+  s_ec5f172ef9c576::t_fca3df8c058139 11
+test/work-context.test.js
+  s_ec5f172ef9c576::t_e7f5809b63591b 2,6,9,245-296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.52-trip",
+  "base_commit_sha": "e306b8edc16fa9a8d39fd0b5e439d720ed22499c",
+  "prompts": {},
+  "sessions": {
+    "s_ec5f172ef9c576": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ef19-f26b-7101-af10-377aff3454c3",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "kp_chen <kp_chen@trip.com>"
+    }
+  }
+}
