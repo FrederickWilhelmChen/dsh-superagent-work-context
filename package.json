@@ -1,42 +1,42 @@
 {
-  "name": "dsh-feishu-plugin",
+  "name": "dsh-superagent-work-context",
   "version": "0.1.0",
-  "private": true,
-  "description": "DSH 飞书插件：右侧边栏读取飞书任务 / 总结机器人所在群聊，并把任务一键加入输入框",
-  "type": "module",
+  "description": "Evidence-backed Feishu work context and private reminders for DSH SuperAgent",
   "license": "MIT",
-  "main": "lib/index.js",
+  "keywords": ["dsh-plugin", "deepseek-harness", "superagent", "feishu"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FrederickWilhelmChen/dsh-superagent-work-context.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "exports": {
-    ".": {
-      "default": "./lib/index.js"
-    },
-    "./client": {
-      "default": "./lib/client.js"
-    },
+    ".": "./src/index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
     "./package.json": "./package.json"
   },
   "files": [
-    "lib",
-    "docs",
-    "scripts"
+    "src",
+    "locale",
+    "icon.svg",
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md"
   ],
-  "scripts": {
-    "test": "node test/run.mjs",
-    "check": "node scripts/check.mjs",
-    "bootstrap": "node scripts/bootstrap-deps.mjs",
-    "apply-profile": "node scripts/apply-profile.mjs",
-    "panel-check": "node scripts/panel-check.mjs"
-  },
   "dsh": {
-    "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-sidebar-right"
-      ],
-      "external": []
-    }
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "manifestVersion": 1
   },
-  "engines": {
-    "node": ">=20"
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.5-alpha.1",
+    "proper-lockfile": "4.1.2"
+  },
+  "scripts": {
+    "test": "node --test"
   }
 }

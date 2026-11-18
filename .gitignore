@@ -6,3 +6,6 @@ node_modules/
 
 # Profile patch backups written by scripts/apply-profile.mjs
 *.bak
+
+# Packed release files
+*.tgz

@@ -1,0 +1,4 @@
+- insert:
+    - id: dsh-superagent-work-context
+      name: dsh-superagent-work-context
+      config: {}
